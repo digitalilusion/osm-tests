@@ -10,6 +10,9 @@
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.3.3/dist/leaflet.css"
    integrity="sha512-Rksm5RenBEKSKFjgI3a41vrjkw4EVPlJ3+OiI65vTjIdo9brlAacEuKOiQ5OFh7cOI1bkDwLqdLw3Zg0cRJAAQ=="
    crossorigin=""/>
+   <script src="https://unpkg.com/leaflet@1.3.3/dist/leaflet.js"
+  integrity="sha512-tAGcCfR4Sc5ZP5ZoVz0quoZDYX5aCtEm/eu1KhSLj2c9eFrylXZknQYmxUssFaVJKvvc0dJQixhGjG2yXWiV9Q=="
+  crossorigin=""></script>
    <style media="screen">
      #mapid { height: 400px; }
    </style>
@@ -23,18 +26,23 @@
 
     <script src="https://ajax.googleapis.com/ajax/libs/jquery/2.1.4/jquery.min.js"></script>
     <script src="https://maxcdn.bootstrapcdn.com/bootstrap/4.0.0-alpha.2/js/bootstrap.min.js" integrity="sha384-vZ2WRJMwsjRMW/8U7i6PWi6AlO1L79snBrmgiDpgIWJ82z8eA5lenwvxbMV1PAh7" crossorigin="anonymous"></script>
-    <script src="https://unpkg.com/leaflet@1.3.3/dist/leaflet.js"
-   integrity="sha512-tAGcCfR4Sc5ZP5ZoVz0quoZDYX5aCtEm/eu1KhSLj2c9eFrylXZknQYmxUssFaVJKvvc0dJQixhGjG2yXWiV9Q=="
-   crossorigin=""></script>
+
    <script src="assets/js/osmtogeojson.js" charset="utf-8"></script>
    <script type="text/javascript">
    var mymap;
    var geoLayer;
+
+   var icon_unmarked = 'https://github.com/yopaseopor/accessibilitat/raw/master/icons/crossing_unmarked.png';
+   var icon_obstacle_wheelchair = 'https://github.com/yopaseopor/accessibilitat/raw/master/icons/obstacle_wheelchair_yes.png';
+   var icon_shop_no_wheelchair = 'https://github.com/yopaseopor/accessibilitat/raw/master/icons/wheelchair_no_shop.png';
+   var icon_shop_yes_wheelchair = 'https://github.com/yopaseopor/accessibilitat/raw/master/icons/wheelchair_yes_shop.png';
+   var icon_shop_limited_wheelchair = 'https://github.com/yopaseopor/accessibilitat/raw/master/icons/wheelchair_limited_shop.png';
+
    var setupMap = function () {
      mymap = L.map('mapid').setView([41.4441608, 2.2234922], 13);
      var osmUrl='https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png';
      var osmAttrib='Map data © <a href="https://openstreetmap.org">OpenStreetMap</a> contributors';
-     var osm = new L.TileLayer(osmUrl, {minZoom: 8, maxZoom: 16, attribution: osmAttrib});
+     var osm = new L.TileLayer(osmUrl, {minZoom: 8, maxZoom: 18, attribution: osmAttrib});
      mymap.addLayer(osm);
      geoLayer = L.geoJson().addTo(mymap);
    };
@@ -67,10 +75,55 @@
 			dataType: 'json',
 			url: 'http://overpass-api.de/api/interpreter',
 			success: function(json) {
-        //console.log(json);
 				mymap.removeLayer(geoLayer);
 				var geojson = osmtogeojson(json);
-				geoLayer = L.geoJson(geojson).addTo(mymap);
+
+				geoLayer = L.geoJson(geojson, {
+          filter: function (feature, layer) {
+            return feature.properties.type === "node";
+          },
+          pointToLayer: function(feature, latlng) {
+            //console.log(feature);
+            var icon = null;
+            if (feature.properties.tags.shop) {
+              if (feature.properties.tags.wheelchair == "yes") {
+                icon = L.icon({
+                          iconSize: [27, 27],
+                          iconAnchor: [13, 27],
+                          popupAnchor:  [1, -24],
+                          iconUrl: icon_shop_yes_wheelchair
+                });
+
+              } else if (feature.properties.tags.wheelchair == "no") {
+                icon = L.icon({
+                          iconSize: [27, 27],
+                          iconAnchor: [13, 27],
+                          popupAnchor:  [1, -24],
+                          iconUrl: icon_shop_no_wheelchair
+                });
+
+              } else if (feature.properties.tags.wheelchair == "limited") {
+                icon = L.icon({
+                          iconSize: [27, 27],
+                          iconAnchor: [13, 27],
+                          popupAnchor:  [1, -24],
+                          iconUrl: icon_shop_limited_wheelchair
+                });
+
+              }
+
+            }
+            if (icon) {
+              return L.marker(latlng, {icon: icon});
+            }
+
+          },
+          onEachFeature: function (feature, layer) {
+            if (feature.properties.tags.name) {
+              layer.bindPopup(feature.properties.tags.name);
+            }
+          }
+        }).addTo(mymap);
 				mymap.fitBounds( geoLayer.getBounds() );
 				//geoList.reload( geoLayer );
 
